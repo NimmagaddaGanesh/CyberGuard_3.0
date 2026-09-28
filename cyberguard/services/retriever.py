@@ -2,15 +2,14 @@
 
 Provides the HistoricalMemoryRetriever abstraction and the LocalDatasetRetriever
 implementation for searching historical incidents deterministically.
-Designed to be replaced by Hindsight Cloud in Phase 14 without altering Groq or API layers.
 """
 from abc import ABC, abstractmethod
 import re
 from typing import Any, Dict, List, Optional, Set
 from pydantic import BaseModel, Field
 
-from backend.models.incident import IncidentAlert, IncidentRecord, ResolutionRecord
-from backend.services.dataset_service import dataset_service
+from cyberguard.models.incident import IncidentAlert, IncidentRecord, ResolutionRecord
+from cyberguard.services.dataset_service import dataset_service
 
 
 class HistoricalEvidence(BaseModel):

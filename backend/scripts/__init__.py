@@ -1,1 +1,0 @@
-"""CyberGuard Scripts Package."""

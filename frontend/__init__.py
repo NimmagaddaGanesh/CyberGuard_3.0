@@ -1,1 +1,0 @@
-"""CyberGuard Frontend Package."""

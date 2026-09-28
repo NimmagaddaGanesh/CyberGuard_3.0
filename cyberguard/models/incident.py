@@ -58,5 +58,3 @@ class AnalystFeedback(BaseModel):
     status: Literal["worked", "failed", "partially_useful"]
     analyst_notes: Optional[str] = None
     playbook_id: Optional[str] = None
-    efficacy_rating: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    extensions: Dict[str, Any] = Field(default_factory=dict)

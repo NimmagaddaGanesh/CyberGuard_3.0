@@ -3,20 +3,17 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 from groq import Groq
-from backend.config import settings
-from backend.models.investigation import InvestigationResponse
-from backend.services.context_synthesizer import SynthesizedContext
-from backend.services.prompt_builder import PromptBuilder
+
+from cyberguard.config import settings
+from cyberguard.models.investigation import InvestigationResponse
+from cyberguard.services.context_synthesizer import SynthesizedContext
+from cyberguard.services.prompt_builder import PromptBuilder
 
 logger = logging.getLogger(__name__)
 
 
 class GroqService:
-    """Service handling interactions with the Groq API for incident analysis.
-    
-    Does NOT interact with Hindsight or any memory platform directly.
-    Accepts historical context supplied by the caller.
-    """
+    """Service handling interactions with the Groq API for incident analysis."""
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None, client: Optional[Groq] = None):
         self.api_key = api_key or settings.GROQ_API_KEY
@@ -68,18 +65,19 @@ class GroqService:
 
     def investigate_with_context(
         self,
-        ctx: SynthesizedContext,
+        context: SynthesizedContext,
         temperature: float = 0.1
     ) -> InvestigationResponse:
-        """Convenience method to investigate directly from a SynthesizedContext."""
+        """Convenience method accepting a SynthesizedContext directly."""
+        alert_data = context.current_alert
         return self.investigate(
-            alert_title=ctx.current_alert.get("alert_title", "Unknown Alert"),
-            raw_logs=ctx.current_alert.get("raw_logs", ""),
-            affected_system=ctx.current_alert.get("affected_system"),
-            historical_context=ctx,
+            alert_title=alert_data.get("alert_title", "Unknown Alert"),
+            raw_logs=alert_data.get("raw_logs", ""),
+            affected_system=alert_data.get("affected_system"),
+            historical_context=context,
             temperature=temperature
         )
 
 
-# Global default instance
+# Global singleton instance
 groq_service = GroqService()

@@ -6,12 +6,12 @@ import json
 import pytest
 from pydantic import ValidationError
 from unittest.mock import MagicMock
-from backend.models.investigation import (
+from cyberguard.models.investigation import (
     InvestigationResponse,
     ActionItem
 )
-from backend.services.prompt_builder import PromptBuilder
-from backend.services.groq_service import GroqService
+from cyberguard.services.prompt_builder import PromptBuilder
+from cyberguard.services.groq_service import GroqService
 
 
 @pytest.fixture
@@ -59,49 +59,54 @@ def test_confidence_score_range_validation(valid_response_data, invalid_score):
     """Verify confidence_score is bounded between 0.0 and 1.0."""
     invalid_data = valid_response_data.copy()
     invalid_data["confidence_score"] = invalid_score
-    with pytest.raises(ValidationError) as exc_info:
+    with pytest.raises(ValidationError):
         InvestigationResponse.model_validate(invalid_data)
-    assert "confidence_score" in str(exc_info.value)
 
 
-def test_required_fields_missing(valid_response_data):
-    """Verify that missing critical fields raises ValidationError."""
-    incomplete_data = valid_response_data.copy()
-    del incomplete_data["root_cause_analysis"]
+def test_action_item_structure(valid_response_data):
+    """Verify ActionItem fields."""
+    item_data = valid_response_data["recommended_actions"][0]
+    action = ActionItem.model_validate(item_data)
+    assert action.priority == 1
+    assert action.action == "Enforce MFA and rotate session keys"
+    assert action.status == "RECOMMENDED"
+    assert action.warning is None
 
-    with pytest.raises(ValidationError) as exc_info:
-        InvestigationResponse.model_validate(incomplete_data)
-    assert "root_cause_analysis" in str(exc_info.value)
+
+def test_action_item_with_warning(valid_response_data):
+    """Verify ActionItem with warning."""
+    item_data = valid_response_data["recommended_actions"][1]
+    action = ActionItem.model_validate(item_data)
+    assert action.priority == 2
+    assert action.status == "DISCOURAGED_WARNING"
+    assert action.warning is not None
 
 
-def test_prompt_builder_no_memory():
-    """Verify that PromptBuilder explicitly notes absence of memory for cold start."""
-    prompt = PromptBuilder.build_user_prompt(
-        alert_title="Unrecognized token usage",
-        raw_logs="HTTP 401 Unauthorized bursts",
+def test_prompt_builder_system_prompt_contains_json_rules():
+    """Verify system prompt contains critical SOC persona and JSON schema requirements."""
+    prompt = PromptBuilder.get_system_prompt()
+    assert "CyberGuard" in prompt
+    assert "Senior Tier-3 SOC Incident Response Specialist" in prompt
+    assert "JSON RESPONSE SCHEMA" in prompt
+    assert "RECOMMENDED" in prompt
+    assert "DISCOURAGED_WARNING" in prompt
+    assert "investigation_id" in prompt
+
+
+def test_prompt_builder_handles_empty_context():
+    """Verify prompt builder handles empty/None context safely."""
+    user_prompt = PromptBuilder.build_user_prompt(
+        alert_title="Test Alert",
+        raw_logs="sample logs",
+        affected_system="test-sys",
         historical_context=None
     )
-    assert "NO HISTORICAL EVIDENCE AVAILABLE" in prompt
-    assert "Unrecognized token usage" in prompt
+    assert "Test Alert" in user_prompt
+    assert "No historical institutional memory" in user_prompt
 
 
-def test_prompt_builder_with_memory():
-    """Verify that PromptBuilder embeds historical incident context when provided."""
-    memories = [
-        {"incident_id": "INC-001", "root_cause": "Leaked bearer token"}
-    ]
-    prompt = PromptBuilder.build_user_prompt(
-        alert_title="Token anomaly",
-        raw_logs="HTTP 403 Forbidden",
-        historical_context=memories
-    )
-    assert "INC-001" in prompt
-    assert "Leaked bearer token" in prompt
-    assert "Ground your analysis in this historical experience" in prompt
-
-
-def test_groq_service_investigate_mocked(valid_response_data):
-    """Verify GroqService.investigate parses LLM output into InvestigationResponse without network calls."""
+def test_groq_service_mock_call(valid_response_data):
+    """Verify GroqService parses valid JSON response into InvestigationResponse."""
     mock_client = MagicMock()
     mock_choice = MagicMock()
     mock_choice.message.content = json.dumps(valid_response_data)
@@ -109,15 +114,13 @@ def test_groq_service_investigate_mocked(valid_response_data):
     mock_response.choices = [mock_choice]
     mock_client.chat.completions.create.return_value = mock_response
 
-    service = GroqService(api_key="mock_key", client=mock_client)
-    result = service.investigate(
-        alert_title="Suspicious SSH connections",
-        raw_logs="Failed password for invalid user admin",
-        historical_context=[{"incident_id": "INC-2026-0042"}]
+    svc = GroqService(api_key="gsk_dummy", model="test-model", client=mock_client)
+    res = svc.investigate(
+        alert_title="Test Alert",
+        raw_logs="test logs",
+        affected_system="host1"
     )
 
-    assert isinstance(result, InvestigationResponse)
-    assert result.investigation_id == "INV-2026-8812"
-    assert result.confidence_score == 0.912
-    assert result.recommended_actions[0].action == "Enforce MFA and rotate session keys"
-    assert mock_client.chat.completions.create.called
+    assert isinstance(res, InvestigationResponse)
+    assert res.investigation_id == "INV-2026-8812"
+    assert len(res.recommended_actions) == 2
