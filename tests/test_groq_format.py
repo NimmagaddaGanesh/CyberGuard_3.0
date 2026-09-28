@@ -1,4 +1,4 @@
-"""Tests for Groq response structure, Pydantic schemas, and PromptBuilder.
+"""Tests for Groq response structure, Pydantic schemas, and LLMService.
 
 These tests execute without making real API calls, ensuring no API credits are consumed.
 """
@@ -6,12 +6,13 @@ import json
 import pytest
 from pydantic import ValidationError
 from unittest.mock import MagicMock
-from cyberguard.models.investigation import (
+from llm_service import (
     InvestigationResponse,
-    ActionItem
+    ActionItem,
+    LLMService,
+    SYSTEM_PROMPT,
+    build_user_prompt,
 )
-from cyberguard.services.prompt_builder import PromptBuilder
-from cyberguard.services.groq_service import GroqService
 
 
 @pytest.fixture
@@ -82,9 +83,9 @@ def test_action_item_with_warning(valid_response_data):
     assert action.warning is not None
 
 
-def test_prompt_builder_system_prompt_contains_json_rules():
+def test_system_prompt_contains_json_rules():
     """Verify system prompt contains critical SOC persona and JSON schema requirements."""
-    prompt = PromptBuilder.get_system_prompt()
+    prompt = SYSTEM_PROMPT
     assert "CyberGuard" in prompt
     assert "Senior Tier-3 SOC Incident Response Specialist" in prompt
     assert "JSON RESPONSE SCHEMA" in prompt
@@ -95,7 +96,7 @@ def test_prompt_builder_system_prompt_contains_json_rules():
 
 def test_prompt_builder_handles_empty_context():
     """Verify prompt builder handles empty/None context safely."""
-    user_prompt = PromptBuilder.build_user_prompt(
+    user_prompt = build_user_prompt(
         alert_title="Test Alert",
         raw_logs="sample logs",
         affected_system="test-sys",
@@ -105,8 +106,8 @@ def test_prompt_builder_handles_empty_context():
     assert "No historical institutional memory" in user_prompt
 
 
-def test_groq_service_mock_call(valid_response_data):
-    """Verify GroqService parses valid JSON response into InvestigationResponse."""
+def test_llm_service_mock_call(valid_response_data):
+    """Verify LLMService parses valid JSON response into InvestigationResponse."""
     mock_client = MagicMock()
     mock_choice = MagicMock()
     mock_choice.message.content = json.dumps(valid_response_data)
@@ -114,7 +115,7 @@ def test_groq_service_mock_call(valid_response_data):
     mock_response.choices = [mock_choice]
     mock_client.chat.completions.create.return_value = mock_response
 
-    svc = GroqService(api_key="gsk_dummy", model="test-model", client=mock_client)
+    svc = LLMService(api_key="gsk_dummy", model="test-model", client=mock_client)
     res = svc.investigate(
         alert_title="Test Alert",
         raw_logs="test logs",

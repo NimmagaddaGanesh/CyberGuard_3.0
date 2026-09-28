@@ -14,20 +14,24 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from cyberguard.config import settings
-from cyberguard.services.groq_service import GroqService
+import os
+from dotenv import load_dotenv
+load_dotenv()
+from llm_service import LLMService, llm_service
 
 
 def run_manual_test():
     print("=== CyberGuard — Manual Groq Live Inference Test ===")
-    if not settings.GROQ_API_KEY:
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
         print("[ERROR] GROQ_API_KEY is not set in your .env file.")
         sys.exit(1)
 
-    print(f"Model configured: {settings.GROQ_MODEL}")
+    model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+    print(f"Model configured: {model}")
     print("Initializing Groq client...")
 
-    service = GroqService()
+    service = llm_service
 
     # Sample alert simulating an SSH credential attack
     alert_title = "Multiple SSH login failures detected from external subnet"

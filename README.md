@@ -1,44 +1,58 @@
 # CyberGuard — AI Incident Response & Memory Reasoning Engine
 
-CyberGuard is a memory-powered AI incident response engine for Security Operations Centers (SOCs). It couples 1,000 empirical historical incidents with Bayesian confidence scoring and Groq high-speed LLM inference to generate structured, actionable incident response triage.
+CyberGuard is a service-oriented AI incident response engine for Security Operations Centers (SOCs). It couples 1,000 empirical historical incidents with Bayesian confidence scoring and Groq high-speed LLM inference to generate structured, actionable incident response triage.
 
 ---
 
-## 📦 What's in this Repository (Your AI Role Files)
+## 📦 Service-Oriented Architecture (Your Role Files)
 
-This repository contains the standalone AI reasoning engine and dataset, structured for seamless integration into any backend:
+All AI reasoning, retrieval, and LLM inference are cleanly encapsulated into two service-oriented modules:
 
-- **`cyberguard/`** — Core AI & Bayesian reasoning package:
-  - `engine.py` — High-level investigation pipeline (`investigate_incident`).
-  - `models/` — Canonical Pydantic schemas (`IncidentAlert`, `InvestigationResponse`, etc.).
-  - `services/` — Dataset service, historical retriever, Bayesian confidence synthesizer, prompt builder, Groq client.
-- **`cyberguard_incidents_1000.json`** — Primary validated dataset: 1,000 incidents (700 Traditional Cyber, 300 AI Security).
+- **`context_builder_service.py`** — Context Builder Service:
+  - Canonical data models (`IncidentAlert`, `IncidentRecord`, `ResolutionRecord`, `SynthesizedContext`).
+  - 1,000 incident dataset loading, querying, and validation.
+  - Heuristic & semantic similarity retrieval across institutional memory.
+  - Bayesian confidence formula:
+    $$\text{Confidence} = 0.40 \times \text{Similarity} + 0.60 \times \frac{\text{Successes} + 1}{\text{Trials} + 2}$$
+  - Context synthesis separating current alert from historical evidence.
+
+- **`llm_service.py`** — LLM Inference Service:
+  - Canonical investigation schemas (`InvestigationResponse`, `ActionItem`).
+  - Tier-3 SOC Specialist prompt engineering with strict evidence grounding rules.
+  - Groq LLM integration (`openai/gpt-oss-120b`).
+  - High-level investigation pipeline (`investigate_incident`).
+
+- **`cyberguard_incidents_1000.json`** — Primary validated dataset (700 Traditional Cyber, 300 AI Security).
 - **`data/playbooks/`** — Playbooks (PB-001 to PB-005) for automated remediation guidance.
-- **`run_incident_response.py`** — Interactive CLI runner to test and simulate incident investigations directly.
-- **`tests/`** — Automated test suite verifying schema compliance, Bayesian mathematics, and dataset integrity.
+- **`run_incident_response.py`** — Terminal agent runner to test and simulate incident response.
+- **`tests/`** — Automated unit test suite verifying schema validation, Bayesian calculation, and response formats.
 
 ---
 
-## 🔌 How to Integrate into the Backend
+## 🔌 How Your Teammate Integrates into the Backend
 
 Your teammate can import and run investigations in **2 lines of code**:
 
 ```python
-from cyberguard import investigate_incident, IncidentAlert
+from llm_service import investigate_incident, IncidentAlert
 
-# Call with a dictionary or IncidentAlert:
-response = investigate_incident({
-    "alert_title": "Detected SQL Injection attempt on web-portal",
-    "affected_system": "prod-db-cluster",
-    "raw_logs": "UNION SELECT username, password_hash FROM users --"
-})
+# Inside any backend API route / controller:
+@app.post("/api/investigate")
+def investigate(alert: IncidentAlert):
+    response = investigate_incident(alert)
+    return response.model_dump()
+```
 
-# Access structured fields directly:
-print(response.investigation_id)
-print(response.summary)
-print(response.confidence_score)
-print(response.recommended_actions)
-print(response.model_dump()) # Clean JSON dictionary for API responses
+Or access the services individually:
+```python
+from context_builder_service import context_builder_service
+from llm_service import llm_service
+
+# Build memory-backed Bayesian context:
+context = context_builder_service.build_context(alert_data)
+
+# Run LLM inference:
+response = llm_service.investigate_with_context(context)
 ```
 
 ---
